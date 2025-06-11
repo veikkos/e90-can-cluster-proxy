@@ -38,6 +38,54 @@ const pad = (value, length, decimals = 0) => {
 
 const toTF = (bool) => (bool ? 'T' : 'F');
 
+let fuelInjectionTotal = 0;
+let fuelInjectionHistory = [];
+
+let lastFuelAmount = 0;
+let lastFuelMeasurement = 0;
+
+function updateFuelInjection(data) {
+    const now = Date.now();
+
+    if (lastFuelMeasurement !== 0 && data.fuel < lastFuelAmount) {
+        const deltaFuel = lastFuelAmount - data.fuel;
+        const deltaTimeMin = (now - lastFuelMeasurement) / 60000;
+
+        if (deltaTimeMin > 0 && deltaTimeMin < 5) {
+            const estimatedFuelTankL = 60
+            const litersUsed = deltaFuel * estimatedFuelTankL;
+            const ulUsed = litersUsed * 1000000;
+
+            fuelInjectionHistory.push(ulUsed);
+            if (fuelInjectionHistory.length > 10) {
+                fuelInjectionHistory.shift();
+            }
+
+            const avgUlUsed = fuelInjectionHistory.reduce((a, b) => a + b, 0) / fuelInjectionHistory.length;
+            const cylinders = 6;
+            const combustionEventsPerMin = data.rpm;
+
+            // Total time interval in minutes
+            const totalTimeMin = deltaTimeMin * fuelInjectionHistory.length;
+
+            // Total combustion events over all those intervals
+            const totalCombustions = combustionEventsPerMin * totalTimeMin;
+
+            if (totalCombustions > 0) {
+                const avgUlPerCycle = (avgUlUsed * cylinders) / totalCombustions;
+
+                // Add per-cycle injection to cumulative counter
+                fuelInjectionTotal = (fuelInjectionTotal + Math.round(avgUlPerCycle)) & 0xFFFF;
+            }
+        }
+    }
+
+    lastFuelAmount = data.fuel;
+    lastFuelMeasurement = now;
+
+    return fuelInjectionTotal;
+}
+
 const server = udp.createServer(function (buff) {
     const data = {
         car: buff.toString('ascii', 4, 8),
@@ -74,6 +122,8 @@ const server = udp.createServer(function (buff) {
         );
     };
 
+    const injectionCounter = updateFuelInjection(data);
+
     const asciiMsg =
         formatTimestamp() +
         pad(data.rpm, 5) +
@@ -89,7 +139,8 @@ const server = udp.createServer(function (buff) {
         toTF(data.showlights & (1 << 6)) +   // SIGNAL_R
         toTF(data.showlights & (1 << 8)) +   // OILWARN
         toTF(data.showlights & (1 << 9)) +   // BATTERY
-        toTF(data.showlights & (1 << 10));   // ABS
+        toTF(data.showlights & (1 << 10)) +  // ABS
+        pad(injectionCounter, 5)
 
     if (serialPort.isOpen) {
         serialPort.write(asciiMsg + "\n");
