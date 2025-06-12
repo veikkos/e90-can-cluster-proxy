@@ -1,7 +1,7 @@
 'use strict';
 
 const udp = require("udp-hub");
-const { SerialPort } = require("serialport");  // ✅ FIXED import
+const { SerialPort } = require("serialport");
 
 const portName = process.argv[2] || "COM3";
 
@@ -20,8 +20,7 @@ let rxBuffer = '';
 
 serialPort.on("data", (data) => {
     rxBuffer += data.toString();
-
-    let lines = rxBuffer.split(/\r?\n/);
+    const lines = rxBuffer.split(/\r?\n/);
     rxBuffer = lines.pop();
 
     for (let line of lines) {
@@ -38,52 +37,43 @@ const pad = (value, length, decimals = 0) => {
 
 const toTF = (bool) => (bool ? 'T' : 'F');
 
-let fuelInjectionTotal = 0;
-let fuelInjectionHistory = [];
-
+let fuelInjectionHistory = []; // {fuelPct, timestamp}
 let lastFuelAmount = 0;
 let lastFuelMeasurement = 0;
 
+// Returns filtered value of fuel consumed per 100 ms in micro liters
 function updateFuelInjection(data) {
     const now = Date.now();
-
-    if (lastFuelMeasurement !== 0 && data.fuel < lastFuelAmount) {
-        const deltaFuel = lastFuelAmount - data.fuel;
-        const deltaTimeMin = (now - lastFuelMeasurement) / 60000;
-
-        if (deltaTimeMin > 0 && deltaTimeMin < 5) {
-            const estimatedFuelTankL = 60
-            const litersUsed = deltaFuel * estimatedFuelTankL;
-            const ulUsed = litersUsed * 1000000;
-
-            fuelInjectionHistory.push(ulUsed);
-            if (fuelInjectionHistory.length > 10) {
-                fuelInjectionHistory.shift();
-            }
-
-            const avgUlUsed = fuelInjectionHistory.reduce((a, b) => a + b, 0) / fuelInjectionHistory.length;
-            const cylinders = 6;
-            const combustionEventsPerMin = data.rpm;
-
-            // Total time interval in minutes
-            const totalTimeMin = deltaTimeMin * fuelInjectionHistory.length;
-
-            // Total combustion events over all those intervals
-            const totalCombustions = combustionEventsPerMin * totalTimeMin;
-
-            if (totalCombustions > 0) {
-                const avgUlPerCycle = (avgUlUsed * cylinders) / totalCombustions;
-
-                // Add per-cycle injection to cumulative counter
-                fuelInjectionTotal = (fuelInjectionTotal + Math.round(avgUlPerCycle)) & 0xFFFF;
-            }
-        }
-    }
+    const deltaFuel = lastFuelAmount - data.fuel;
+    const deltaTimeMin = (now - lastFuelMeasurement) / 60000;
 
     lastFuelAmount = data.fuel;
     lastFuelMeasurement = now;
 
-    return fuelInjectionTotal;
+    if (deltaFuel > 0 && deltaTimeMin > 0 && deltaTimeMin < 5) {
+        fuelInjectionHistory.push({
+            fuelPct: data.fuel,
+            timestamp: now
+        });
+
+        while (fuelInjectionHistory.length > 10) fuelInjectionHistory.shift();
+        if (fuelInjectionHistory.length < 2) return 0;
+
+        const first = fuelInjectionHistory[0];
+        const last = fuelInjectionHistory[fuelInjectionHistory.length - 1];
+
+        const tankLiters = 61;
+        const fuelConsumedUl = (first.fuelPct - last.fuelPct) * tankLiters * 1e6;
+
+        const durationMs = (last.timestamp - first.timestamp);
+        const cycles = durationMs / 100;
+
+        if (fuelConsumedUl > 0 && cycles > 0) {
+            return Math.round(fuelConsumedUl / cycles);
+        }
+    }
+
+    return 0;
 }
 
 const server = udp.createServer(function (buff) {
@@ -106,8 +96,6 @@ const server = udp.createServer(function (buff) {
         clutch: buff.readFloatLE(56)
     };
 
-    console.log(data);
-
     const formatTimestamp = () => {
         const now = new Date();
         const pad2 = (n) => n.toString().padStart(2, '0');
@@ -122,7 +110,7 @@ const server = udp.createServer(function (buff) {
         );
     };
 
-    const injectionCounter = updateFuelInjection(data);
+    const injectionValue = updateFuelInjection(data);
 
     const asciiMsg =
         formatTimestamp() +
@@ -140,7 +128,9 @@ const server = udp.createServer(function (buff) {
         toTF(data.showlights & (1 << 8)) +   // OILWARN
         toTF(data.showlights & (1 << 9)) +   // BATTERY
         toTF(data.showlights & (1 << 10)) +  // ABS
-        pad(injectionCounter, 5)
+        pad(injectionValue, 4);
+
+    console.log(asciiMsg);
 
     if (serialPort.isOpen) {
         serialPort.write(asciiMsg + "\n");
