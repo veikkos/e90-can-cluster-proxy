@@ -2,6 +2,7 @@
 
 const udp = require("udp-hub");
 const { SerialPort } = require("serialport");
+const readline = require("readline");
 
 const portName = process.argv[2] || "COM3";
 
@@ -27,6 +28,53 @@ serialPort.on("data", (data) => {
         if (line.trim().length > 0) {
             console.log(`[MBED] ${line.trim()}`);
         }
+    }
+});
+
+let customLightNumber = '0000';
+let customLightState = false;
+
+/*
+// Looping state
+let lightLoopIndex = 1;
+let lightLoopTimer = setInterval(() => {
+    // Turn off the previous light
+    customLightNumber = (lightLoopIndex - 1 <= 0 ? 99999 : lightLoopIndex - 1).toString().padStart(4, '0');
+    customLightState = false;
+
+    // Emit OFF first
+    sendLoopState();
+
+    // Then turn on the next light
+    setTimeout(() => {
+        customLightNumber = lightLoopIndex.toString().padStart(4, '0');
+        customLightState = true;
+        sendLoopState();
+
+        lightLoopIndex = (lightLoopIndex % 99999) + 1;
+    }, 500);
+}, 4000);
+
+function sendLoopState() {
+    // optional: show to user
+    console.log(`[LOOP] Light ${customLightNumber} = ${customLightState ? 'T' : 'F'}`);
+}
+*/
+
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+rl.on("line", (input) => {
+    input = input.trim().toUpperCase();
+    const match = input.match(/^(\d{1,4})([TF])$/);
+    if (match) {
+        customLightNumber = match[1].padStart(4, '0');
+        customLightState = match[2] === 'T';
+        console.log(`[INPUT] Set custom light ${customLightNumber} = ${customLightState ? 'ON' : 'OFF'}`);
+    } else {
+        console.log(`[INPUT] Invalid format. Use e.g. 5T or 12F`);
     }
 });
 
@@ -64,8 +112,7 @@ function updateFuelInjection(data) {
 
         const tankLiters = 61;
         const fuelConsumedUl = (first.fuelPct - last.fuelPct) * tankLiters * 1e6;
-
-        const durationMs = (last.timestamp - first.timestamp);
+        const durationMs = last.timestamp - first.timestamp;
         const cycles = durationMs / 100;
 
         if (fuelConsumedUl > 0 && cycles > 0) {
@@ -128,9 +175,12 @@ const server = udp.createServer(function (buff) {
         toTF(data.showlights & (1 << 8)) +   // OILWARN
         toTF(data.showlights & (1 << 9)) +   // BATTERY
         toTF(data.showlights & (1 << 10)) +  // ABS
-        pad(injectionValue, 4);
+        toTF(data.engtemp > 105) +
+        toTF(data.engtemp > 120) +
+        pad(injectionValue, 4) +
+        customLightNumber + (customLightState ? 'T' : 'F');
 
-    console.log(asciiMsg);
+    //console.log(asciiMsg);
 
     if (serialPort.isOpen) {
         serialPort.write(asciiMsg + "\n");
@@ -139,3 +189,12 @@ const server = udp.createServer(function (buff) {
 
 server.bind(4444);
 console.log("UDP server listening on port 4444.");
+console.log("Type a custom light command like '12T' or '5F' and press Enter.");
+
+// Graceful shutdown
+process.on("SIGINT", () => {
+    console.log("\nExiting...");
+    clearInterval(lightLoopTimer);
+    rl.close();
+    serialPort.close(() => process.exit(0));
+});
