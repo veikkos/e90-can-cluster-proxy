@@ -33,11 +33,11 @@ serialPort.on("data", (data) => {
 
 let customLightNumber = '0000';
 let customLightState = false;
+let lightLoopTimer;
+let lightLoopIndex = 400;
 
 /*
-// Looping state
-let lightLoopIndex = 1;
-let lightLoopTimer = setInterval(() => {
+lightLoopTimer = setInterval(() => {
     // Turn off the previous light
     customLightNumber = (lightLoopIndex - 1 <= 0 ? 99999 : lightLoopIndex - 1).toString().padStart(4, '0');
     customLightState = false;
@@ -58,8 +58,7 @@ let lightLoopTimer = setInterval(() => {
 function sendLoopState() {
     // optional: show to user
     console.log(`[LOOP] Light ${customLightNumber} = ${customLightState ? 'T' : 'F'}`);
-}
-*/
+}*/
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -160,6 +159,7 @@ const server = udp.createServer(function (buff) {
     const injectionValue = updateFuelInjection(data);
 
     const asciiMsg =
+        'S' +
         formatTimestamp() +
         pad(data.rpm, 5) +
         pad(data.speed * 3.6 * 10, 4) +
@@ -194,7 +194,9 @@ console.log("Type a custom light command like '12T' or '5F' and press Enter.");
 // Graceful shutdown
 process.on("SIGINT", () => {
     console.log("\nExiting...");
-    clearInterval(lightLoopTimer);
+    if (lightLoopTimer) {
+        clearInterval(lightLoopTimer);
+    }
     rl.close();
     serialPort.close(() => process.exit(0));
 });
