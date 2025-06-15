@@ -139,7 +139,8 @@ const server = udp.createServer(function (buff) {
         showlights: buff.readInt32LE(44),
         throttle: buff.readFloatLE(48),
         brake: buff.readFloatLE(52),
-        clutch: buff.readFloatLE(56)
+        clutch: buff.readFloatLE(56),
+        gearMode: String.fromCharCode(buff.readUInt8(96))
     };
 
     const formatTimestamp = () => {
@@ -178,17 +179,19 @@ const server = udp.createServer(function (buff) {
         toTF(data.engtemp > 105) +
         toTF(data.engtemp > 120) +
         pad(injectionValue, 4) +
-        customLightNumber + (customLightState ? 'T' : 'F');
+        customLightNumber + (customLightState ? 'T' : 'F') +
+        data.gearMode;
 
-    //console.log(asciiMsg);
+    // console.log(data);
+    // console.log([...buff].map(b => b.toString(16).padStart(2, '0')).join(' '));
 
     if (serialPort.isOpen) {
         serialPort.write(asciiMsg + "\n");
     }
 });
 
-server.bind(4444);
-console.log("UDP server listening on port 4444.");
+server.bind(4568);
+console.log("UDP server listening on port 4568.");
 console.log("Type a custom light command like '12T' or '5F' and press Enter.");
 
 // Graceful shutdown
