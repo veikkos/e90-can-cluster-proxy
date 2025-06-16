@@ -182,7 +182,8 @@ const server = udp.createServer(function (buff) {
         customLightNumber + (customLightState ? 'T' : 'F') +
         data.gearMode +
         toTF(data.showlights & (1 << 12)) +  // LOWBEAM
-        toTF(data.showlights & (1 << 13));   // ESC
+        toTF(data.showlights & (1 << 13)) +  // ESC
+        toTF(data.showlights & (1 << 14));   // CHECKENGINE
 
     // console.log(data);
     // console.log([...buff].map(b => b.toString(16).padStart(2, '0')).join(' '));
