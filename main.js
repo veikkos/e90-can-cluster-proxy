@@ -8,7 +8,7 @@ const portName = process.argv[2] || "COM3";
 
 const serialPort = new SerialPort({
     path: portName,
-    baudRate: 115200
+    baudRate: 921600
 }, (err) => {
     if (err) {
         console.error("Failed to open serial port:", err.message);
