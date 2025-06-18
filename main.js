@@ -140,7 +140,9 @@ const server = udp.createServer(function (buff) {
         throttle: buff.readFloatLE(48),
         brake: buff.readFloatLE(52),
         clutch: buff.readFloatLE(56),
-        gearMode: String.fromCharCode(buff.readUInt8(96))
+        gearMode: String.fromCharCode(buff.readUInt8(96)),
+        cruiseSpeed: buff.readFloatLE(100),
+        cruiseMode: buff.readUInt32LE(104)
     };
 
     const formatTimestamp = () => {
@@ -184,10 +186,13 @@ const server = udp.createServer(function (buff) {
         toTF(data.showlights & (1 << 12)) +  // LOWBEAM
         toTF(data.showlights & (1 << 13)) +  // ESC
         toTF(data.showlights & (1 << 14)) +  // CHECKENGINE
-        toTF(data.showlights & (1 << 15));   // CLUTCHTEMP
+        toTF(data.showlights & (1 << 15)) +  // CLUTCHTEMP
+        pad(data.cruiseSpeed * 3.6 * 10, 4) +
+        pad(data.cruiseMode, 1);
 
-    // console.log(data);
-    // console.log([...buff].map(b => b.toString(16).padStart(2, '0')).join(' '));
+    //console.log(data);
+    //console.log([...buff].map(b => b.toString(16).padStart(2, '0')).join(' '));
+    //console.log(asciiMsg);
 
     if (serialPort.isOpen) {
         serialPort.write(asciiMsg + "\n");
