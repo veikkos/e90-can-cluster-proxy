@@ -89,7 +89,7 @@ let lastFuelAmount = 0;
 let lastFuelMeasurement = 0;
 
 // Returns filtered value of fuel consumed per 100 ms in micro liters
-function updateFuelInjection(data) {
+function updateFuelInjection(data, fuelCapacity) {
     const now = Date.now();
     const deltaFuel = lastFuelAmount - data.fuel;
     const deltaTimeMin = (now - lastFuelMeasurement) / 60000;
@@ -109,8 +109,7 @@ function updateFuelInjection(data) {
         const first = fuelInjectionHistory[0];
         const last = fuelInjectionHistory[fuelInjectionHistory.length - 1];
 
-        const tankLiters = 61;
-        const fuelConsumedUl = (first.fuelPct - last.fuelPct) * tankLiters * 1e6;
+        const fuelConsumedUl = (first.fuelPct - last.fuelPct) * fuelCapacity * 1e6;
         const durationMs = last.timestamp - first.timestamp;
         const cycles = durationMs / 100;
 
@@ -142,7 +141,8 @@ const server = udp.createServer(function (buff) {
         clutch: buff.readFloatLE(56),
         gearMode: String.fromCharCode(buff.readUInt8(96)),
         cruiseSpeed: buff.readFloatLE(100),
-        cruiseMode: buff.readUInt32LE(104)
+        cruiseMode: buff.readUInt32LE(104),
+        fuelCapacity: buff.readFloatLE(108),
     };
 
     const formatTimestamp = () => {
@@ -159,7 +159,7 @@ const server = udp.createServer(function (buff) {
         );
     };
 
-    const injectionValue = updateFuelInjection(data);
+    const injectionValue = updateFuelInjection(data, data.fuelCapacity);
 
     const asciiMsg =
         'S' +
