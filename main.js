@@ -188,6 +188,7 @@ const server = udp.createServer(function (buff) {
         toTF(data.showlights & (1 << 14)) +  // CHECKENGINE
         toTF(data.showlights & (1 << 15)) +  // CLUTCHTEMP
         toTF(data.showlights & (1 << 16)) +  // FOGLIGHTS
+        toTF(data.showlights & (1 << 17)) +  // BRAKETEMP
         pad(data.cruiseSpeed * 3.6 * 10, 4) +
         pad(data.cruiseMode, 1);
 
