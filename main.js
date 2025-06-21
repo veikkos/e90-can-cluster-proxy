@@ -11,10 +11,10 @@ const serialPort = new SerialPort({
     baudRate: 921600
 }, (err) => {
     if (err) {
-        console.error("Failed to open serial port:", err.message);
-        process.exit(1);
+        tryConnectSerialPort()
+    } else {
+        console.log(`[SERIAL] Serial port ${portName} opened.`);
     }
-    console.log(`Serial port ${portName} opened.`);
 });
 
 let rxBuffer = '';
@@ -29,6 +29,39 @@ serialPort.on("data", (data) => {
             console.log(`[MBED] ${line.trim()}`);
         }
     }
+});
+
+let reconnectInterval = null;
+
+function tryConnectSerialPort() {
+    if (serialPort.isOpen || reconnectInterval) return;
+
+    console.log("[SERIAL] Attempting to open port.");
+
+    reconnectInterval = setInterval(() => {
+        if (serialPort.isOpen) {
+            clearInterval(reconnectInterval);
+            reconnectInterval = null;
+            return;
+        }
+
+        serialPort.open((err) => {
+            if (!err) {
+                console.log("[SERIAL] Port successfully opened.");
+                clearInterval(reconnectInterval);
+                reconnectInterval = null;
+            }
+        });
+    }, 2000);
+}
+
+serialPort.on("close", () => {
+    console.warn("[SERIAL] Port closed.");
+    tryConnectSerialPort();
+});
+
+serialPort.on("error", (err) => {
+    console.error(`[SERIAL ERROR] ${err.message}`);
 });
 
 let customLightNumber = '0000';
