@@ -213,7 +213,7 @@ const server = udp.createServer(function (buff) {
         toTF(data.showlights & (1 << 10)) +  // ABS
         toTF(data.engtemp > 105) +
         toTF(data.engtemp > 120) +
-        pad(injectionValue, 4) +
+        pad(Math.min(injectionValue, 9999), 4) +
         customLightNumber + (customLightState ? 'T' : 'F') +
         data.gearMode +
         toTF(data.showlights & (1 << 12)) +  // LOWBEAM
