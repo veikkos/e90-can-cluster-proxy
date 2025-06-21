@@ -193,6 +193,7 @@ const server = udp.createServer(function (buff) {
         toTF(data.showlights & (1 << 19)) +  // TIREFLAT_FR
         toTF(data.showlights & (1 << 20)) +  // TIREFLAT_RL
         toTF(data.showlights & (1 << 21)) +  // TIREFLAT_RR
+        toTF(data.showlights & (1 << 22)) +  // RADIATOR
         pad(data.cruiseSpeed * 3.6 * 10, 4) +
         pad(data.cruiseMode, 1);
 
