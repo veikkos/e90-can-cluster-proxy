@@ -194,48 +194,42 @@ const server = udp.createServer(function (buff) {
 
     const injectionValue = updateFuelInjection(data, data.fuelCapacity);
 
-    const asciiMsg =
-        'S' +
-        formatTimestamp() +
-        pad(data.rpm, 5) +
-        pad(data.speed * 3.6 * 10, 4) +
-        pad(data.gear, 1) +
-        pad(data.engtemp, 3) +
-        pad(data.fuel * 1000, 4) +
-        toTF(data.showlights & (1 << 0)) +   // SHIFT
-        toTF(data.showlights & (1 << 1)) +   // FULLBEAM
-        toTF(data.showlights & (1 << 2)) +   // HANDBRAKE
-        toTF(data.showlights & (1 << 4)) +   // TC
-        toTF(data.showlights & (1 << 5)) +   // SIGNAL_L
-        toTF(data.showlights & (1 << 6)) +   // SIGNAL_R
-        toTF(data.showlights & (1 << 8)) +   // OILWARN
-        toTF(data.showlights & (1 << 9)) +   // BATTERY
-        toTF(data.showlights & (1 << 10)) +  // ABS
-        toTF(data.engtemp > 105) +
-        toTF(data.engtemp > 120) +
-        pad(Math.min(injectionValue, 9999), 4) +
-        customLightNumber + (customLightState ? 'T' : 'F') +
-        data.gearMode +
-        toTF(data.showlights & (1 << 12)) +  // LOWBEAM
-        toTF(data.showlights & (1 << 13)) +  // ESC
-        toTF(data.showlights & (1 << 14)) +  // CHECKENGINE
-        toTF(data.showlights & (1 << 15)) +  // CLUTCHTEMP
-        toTF(data.showlights & (1 << 16)) +  // FOGLIGHTS
-        toTF(data.showlights & (1 << 17)) +  // BRAKETEMP
-        toTF(data.showlights & (1 << 18)) +  // TIREFLAT_FL
-        toTF(data.showlights & (1 << 19)) +  // TIREFLAT_FR
-        toTF(data.showlights & (1 << 20)) +  // TIREFLAT_RL
-        toTF(data.showlights & (1 << 21)) +  // TIREFLAT_RR
-        toTF(data.showlights & (1 << 22)) +  // RADIATOR
-        pad(data.cruiseSpeed * 3.6 * 10, 4) +
-        pad(data.cruiseMode, 1);
+    const buffer = Buffer.alloc(30); // 28 + 2 markers
+    let offset = 0;
+
+    buffer.writeUInt8('S'.charCodeAt(0), offset++); // Start marker
+
+    const now = new Date();
+    buffer.writeUInt16LE(now.getFullYear(), offset); offset += 2;
+    buffer.writeUInt8(now.getMonth() + 1, offset++);
+    buffer.writeUInt8(now.getDate(), offset++);
+    buffer.writeUInt8(now.getHours(), offset++);
+    buffer.writeUInt8(now.getMinutes(), offset++);
+    buffer.writeUInt8(now.getSeconds(), offset++);
+
+    buffer.writeUInt16LE(Math.max(0, Math.min(65535, Math.round(data.rpm))), offset); offset += 2;
+    buffer.writeUInt16LE(Math.round(data.speed * 3.6 * 10), offset); offset += 2;  // speed x10
+    buffer.writeUInt8(data.gear, offset++);
+    buffer.writeUInt8(Math.round(data.engtemp), offset++);
+    buffer.writeUInt16LE(Math.round(data.fuel * 1000), offset); offset += 2;
+
+    buffer.writeInt32LE(data.showlights, offset); offset += 4;
+
+    buffer.writeUInt16LE(Math.min(injectionValue, 9999), offset); offset += 2;
+    buffer.writeUInt16LE(parseInt(customLightNumber), offset); offset += 2;
+    buffer.writeUInt8(customLightState ? 1 : 0, offset++);
+    buffer.writeUInt8(data.gearMode.charCodeAt(0), offset++);
+    buffer.writeUInt16LE(Math.round(data.cruiseSpeed * 3.6 * 10), offset); offset += 2;
+    buffer.writeUInt8(data.cruiseMode, offset++);
+
+    buffer.writeUInt8('E'.charCodeAt(0), offset++); // End marker
 
     //console.log(data);
     //console.log([...buff].map(b => b.toString(16).padStart(2, '0')).join(' '));
     //console.log(asciiMsg);
 
     if (serialPort.isOpen) {
-        serialPort.write(asciiMsg + "\n");
+        serialPort.write(buffer);
     }
 });
 
