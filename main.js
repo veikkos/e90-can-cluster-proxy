@@ -177,11 +177,12 @@ const server = udp.createServer(function (buff) {
         cruiseMode: buff.readUInt32LE(104),
         fuelCapacity: buff.readFloatLE(108),
         ignitionState: buff.readUInt16LE(112),
+        engineState: buff.readUInt16LE(114),
     };
 
     const injectionValue = updateFuelInjection(data, data.fuelCapacity);
 
-    const buffer = Buffer.alloc(31); // 29 + 2 markers
+    const buffer = Buffer.alloc(32); // 30 + 2 markers
     let offset = 0;
 
     buffer.writeUInt8('S'.charCodeAt(0), offset++); // Start marker
@@ -209,6 +210,7 @@ const server = udp.createServer(function (buff) {
     buffer.writeUInt16LE(Math.round(data.cruiseSpeed * 3.6 * 10), offset); offset += 2;
     buffer.writeUInt8(data.cruiseMode, offset++);
     buffer.writeUInt8(data.ignitionState, offset++);
+    buffer.writeUInt8(data.engineState, offset++);
 
     buffer.writeUInt8('E'.charCodeAt(0), offset++); // End marker
 
