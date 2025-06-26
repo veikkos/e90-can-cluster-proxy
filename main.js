@@ -110,13 +110,6 @@ rl.on("line", (input) => {
     }
 });
 
-const pad = (value, length, decimals = 0) => {
-    const num = (decimals > 0 ? value.toFixed(decimals) : Math.round(value)).toString();
-    return num.padStart(length, '0');
-};
-
-const toTF = (bool) => (bool ? 'T' : 'F');
-
 let fuelInjectionHistory = []; // {fuelPct, timestamp}
 let lastFuelAmount = 0;
 let lastFuelMeasurement = 0;
