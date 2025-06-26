@@ -182,13 +182,13 @@ const server = udp.createServer(function (buff) {
 
     const injectionValue = updateFuelInjection(data, data.fuelCapacity);
 
-    const buffer = Buffer.alloc(32); // 30 + 2 markers
+    const buffer = Buffer.alloc(32); // 29 + checksum + 2 markers
     let offset = 0;
 
     buffer.writeUInt8('S'.charCodeAt(0), offset++); // Start marker
 
     const now = new Date();
-    buffer.writeUInt16LE(now.getFullYear(), offset); offset += 2;
+    buffer.writeUInt8(now.getFullYear() % 2000, offset++);
     buffer.writeUInt8(now.getMonth() + 1, offset++);
     buffer.writeUInt8(now.getDate(), offset++);
     buffer.writeUInt8(now.getHours(), offset++);
@@ -212,6 +212,12 @@ const server = udp.createServer(function (buff) {
     buffer.writeUInt8(data.ignitionState, offset++);
     buffer.writeUInt8(data.engineState, offset++);
 
+    let checksum = 0;
+    for (let i = 1; i < offset; i++) {
+        checksum = (checksum + buffer[i]) & 0xFF;
+    }
+
+    buffer.writeUInt8(checksum, offset++);
     buffer.writeUInt8('E'.charCodeAt(0), offset++); // End marker
 
     //console.log(data);
