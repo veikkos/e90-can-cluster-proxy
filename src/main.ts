@@ -119,17 +119,17 @@ let lastFuelAmount = 0;
 let lastFuelMeasurement = 0;
 
 // Returns filtered value of fuel consumed per 100 ms in micro liters
-function updateFuelInjection(data, fuelCapacity) {
+function updateFuelInjection(fuel, fuelCapacity) {
     const now = Date.now();
-    const deltaFuel = lastFuelAmount - data.fuel;
+    const deltaFuel = lastFuelAmount - fuel;
     const deltaTimeMin = (now - lastFuelMeasurement) / 60000;
 
-    lastFuelAmount = data.fuel;
+    lastFuelAmount = fuel;
     lastFuelMeasurement = now;
 
     if (deltaFuel > 0 && deltaTimeMin > 0 && deltaTimeMin < 5) {
         fuelInjectionHistory.push({
-            fuelPct: data.fuel,
+            fuelPct: fuel,
             timestamp: now
         });
 
@@ -235,8 +235,6 @@ if (isBeamngMode) {
             engineState: buff.readUInt16LE(114),
         };
 
-        const injectionValue = updateFuelInjection(data, data.fuelCapacity);
-
         const buffer = encodeCarData({
             now: new Date(),
             rpm: data.rpm,
@@ -245,7 +243,7 @@ if (isBeamngMode) {
             engtemp: data.engtemp,
             fuel: data.fuel,
             showlights: data.showlights,
-            injectionValue: injectionValue,
+            injectionValue: updateFuelInjection(data.fuel, data.fuelCapacity),
             customLightNumber: customLightNumber,
             customLightState: customLightState,
             gearMode: data.gearMode,
@@ -270,31 +268,84 @@ if (isBeamngMode) {
 } else if (isTruckSimMode) {
     const telemetry = tst()
 
+    function computeDashlights(truck: any): number {
+        const DL_SHIFT        = 1 << 0;
+        const DL_FULLBEAM     = 1 << 1;
+        const DL_HANDBRAKE    = 1 << 2;
+        const DL_TC           = 1 << 4;
+        const DL_SIGNAL_L     = 1 << 5;
+        const DL_SIGNAL_R     = 1 << 6;
+        const DL_OILWARN      = 1 << 8;
+        const DL_BATTERY      = 1 << 9;
+        const DL_ABS          = 1 << 10;
+        const DL_LOWBEAM      = 1 << 12;
+        const DL_ESC          = 1 << 13;
+        const DL_CHECKENGINE  = 1 << 14;
+        const DL_CLUTCHTEMP   = 1 << 15;
+        const DL_FOGLIGHTS    = 1 << 16;
+
+        return (
+            (truck.lights.beamHigh.enabled ? DL_FULLBEAM : 0) |
+            (truck.lights.beamLow.enabled || truck.lights.parking.enabled ? DL_LOWBEAM : 0) |
+            (truck.lights.blinker.left.active || truck.lights.hazard.active ? DL_SIGNAL_L : 0) |
+            (truck.lights.blinker.right.active || truck.lights.hazard.active ? DL_SIGNAL_R : 0) |
+            (truck.brakes.parking.enabled ? DL_HANDBRAKE : 0) |
+            (truck.engine.oilPressure.warning.enabled ? DL_OILWARN : 0) |
+            (truck.engine.batteryVoltage.warning.enabled ? DL_BATTERY : 0) |
+            (truck.engine.checkEngine?.value ? DL_CHECKENGINE : 0)
+        );
+    }
+
+    function getGameClockTime(minutesSinceMidnight: number): Date {
+        const now = new Date();
+        const hours = Math.floor(minutesSinceMidnight / 60) % 24;
+        const minutes = minutesSinceMidnight % 60;
+
+        const gameDate = new Date(now);
+        gameDate.setHours(hours, minutes, 0, 0);
+
+        return gameDate;
+    }
+
     function update(data: any) {
         const truck = data.truck;
 
-        const dashlights =
-            (truck.lights.beamHigh.value ? (1 << 1) : 0) |
-            (truck.lights.beamLow.value ? (1 << 12) : 0);
+        const dashlights = computeDashlights(truck);
 
-        console.log(truck.transmission)
+        const rpm = truck.engine.rpm.value ?? 0;
+        const speed = Math.abs(truck.speed.kph ?? truck.speed.value ?? 0);
+
+        const gearDisplayed = truck.transmission.gear.displayed ?? 0;
+        const gearValue = truck.transmission.gear.selected ?? 0;
+
+        const gear = Math.max(0, gearDisplayed + 1);
+        const gearMode =
+            gear >= 7 ? "A" :
+            gearValue === 0 ? "N" :
+            gearValue < 0 ? "R" : "N";
+
+        const cruiseSpeed = truck.cruiseControl.kph ?? 0;
+        const cruiseMode = truck.cruiseControl.enabled ? 1 : 0;
+
+        const engtemp = Math.round(truck.engine.waterTemperature?.value ?? 0);
+        const fuelPct = truck.fuel.value / (truck.fuel.capacity || 1);
+
         const buffer = encodeCarData({
-            now: new Date(),
-            rpm: truck.engine.rpm.value ?? 0,
-            speed: Math.abs(truck.speed.value ?? 0),
-            gear: Math.max(0, truck.transmission.gear.displayed + 1),
-            engtemp: 0,
-            fuel: 1,
+            now: getGameClockTime(data.game.time.value),
+            rpm: rpm,
+            speed: speed / 3.6,
+            gear: gear,
+            engtemp: engtemp,
+            fuel: Math.min(Math.max(fuelPct, 0), 1), // 0..1
             showlights: dashlights,
             injectionValue: 0,
             customLightNumber: "0",
             customLightState: false,
-            gearMode: truck.transmission.gear.value === 0 ? "N" :
-                    truck.transmission.gear.value < 0 ? "R" : "D",
-            cruiseSpeed: 0,
-            cruiseMode: 0,
-            ignitionState: 2,
-            engineState: 1
+            gearMode: gearMode,
+            cruiseSpeed: cruiseSpeed / 3.6,
+            cruiseMode: cruiseMode,
+            ignitionState: truck.electric.enabled ? 2 : 1,
+            engineState: truck.engine.enabled ? 1 : 0
         });
 
         if (serialPort.isOpen) {
