@@ -1,9 +1,13 @@
 'use strict';
 
 const udp = require("udp-hub");
+const tst = require("trucksim-telemetry")
 const { SerialPort } = require("serialport");
 const readline = require("readline");
 
+const args = process.argv.slice(2);
+const isBeamngMode = args.includes("--beamng");
+const isTruckSimMode = args.includes("--trucksim");
 const portName = process.argv[2] || "COM3";
 
 const serialPort = new SerialPort({
@@ -147,84 +151,162 @@ function updateFuelInjection(data, fuelCapacity) {
     return 0;
 }
 
-const server = udp.createServer(function (buff) {
-    const data = {
-        car: buff.toString('ascii', 4, 8),
-        flags: buff.readUInt16LE(8),
-        gear: buff.readUInt8(10),
-        plid: buff.readUInt8(11),
-        speed: buff.readFloatLE(12),
-        rpm: buff.readFloatLE(16),
-        turbo: buff.readFloatLE(20),
-        engtemp: buff.readFloatLE(24),
-        fuel: buff.readFloatLE(28),
-        oilpressure: buff.readFloatLE(32),
-        oiltemp: buff.readFloatLE(36),
-        dashlights: buff.readInt32LE(40),
-        showlights: buff.readInt32LE(44),
-        throttle: buff.readFloatLE(48),
-        brake: buff.readFloatLE(52),
-        clutch: buff.readFloatLE(56),
-        gearMode: String.fromCharCode(buff.readUInt8(96)),
-        cruiseSpeed: buff.readFloatLE(100),
-        cruiseMode: buff.readUInt32LE(104),
-        fuelCapacity: buff.readFloatLE(108),
-        ignitionState: buff.readUInt16LE(112),
-        engineState: buff.readUInt16LE(114),
-    };
-
-    const injectionValue = updateFuelInjection(data, data.fuelCapacity);
-
+function encodeCarData(params: {
+    now: Date;
+    rpm: number;
+    speed: number;
+    gear: number;
+    engtemp: number;
+    fuel: number;
+    showlights: number;
+    injectionValue: number;
+    customLightNumber: string;
+    customLightState: boolean;
+    gearMode: string;
+    cruiseSpeed: number;
+    cruiseMode: number;
+    ignitionState: number;
+    engineState: number;
+}): Buffer {
     const buffer = Buffer.alloc(32); // 29 + checksum + 2 markers
     let offset = 0;
 
     buffer.writeUInt8('S'.charCodeAt(0), offset++); // Start marker
 
-    const now = new Date();
-    buffer.writeUInt8(now.getFullYear() % 2000, offset++);
-    buffer.writeUInt8(now.getMonth() + 1, offset++);
-    buffer.writeUInt8(now.getDate(), offset++);
-    buffer.writeUInt8(now.getHours(), offset++);
-    buffer.writeUInt8(now.getMinutes(), offset++);
-    buffer.writeUInt8(now.getSeconds(), offset++);
+    buffer.writeUInt8(params.now.getFullYear() % 2000, offset++);
+    buffer.writeUInt8(params.now.getMonth() + 1, offset++);
+    buffer.writeUInt8(params.now.getDate(), offset++);
+    buffer.writeUInt8(params.now.getHours(), offset++);
+    buffer.writeUInt8(params.now.getMinutes(), offset++);
+    buffer.writeUInt8(params.now.getSeconds(), offset++);
 
-    buffer.writeUInt16LE(Math.max(0, Math.min(65535, Math.round(data.rpm))), offset); offset += 2;
-    buffer.writeUInt16LE(Math.round(data.speed * 3.6 * 10), offset); offset += 2;  // speed x10
-    buffer.writeUInt8(data.gear, offset++);
-    buffer.writeUInt8(Math.round(data.engtemp), offset++);
-    buffer.writeUInt16LE(Math.round(data.fuel * 1000), offset); offset += 2;
+    buffer.writeUInt16LE(Math.max(0, Math.min(65535, Math.round(params.rpm))), offset); offset += 2;
+    buffer.writeUInt16LE(Math.round(params.speed * 3.6 * 10), offset); offset += 2;  // speed x10
+    buffer.writeUInt8(params.gear, offset++);
+    buffer.writeUInt8(Math.round(params.engtemp), offset++);
+    buffer.writeUInt16LE(Math.round(params.fuel * 1000), offset); offset += 2;
 
-    buffer.writeInt32LE(data.showlights, offset); offset += 4;
+    buffer.writeInt32LE(params.showlights, offset); offset += 4;
 
-    buffer.writeUInt16LE(Math.min(injectionValue, 9999), offset); offset += 2;
-    buffer.writeUInt16LE(parseInt(customLightNumber), offset); offset += 2;
-    buffer.writeUInt8(customLightState ? 1 : 0, offset++);
-    buffer.writeUInt8(data.gearMode.charCodeAt(0), offset++);
-    buffer.writeUInt16LE(Math.round(data.cruiseSpeed * 3.6 * 10), offset); offset += 2;
-    buffer.writeUInt8(data.cruiseMode, offset++);
-    buffer.writeUInt8(data.ignitionState, offset++);
-    buffer.writeUInt8(data.engineState, offset++);
+    buffer.writeUInt16LE(Math.min(params.injectionValue, 9999), offset); offset += 2;
+    buffer.writeUInt16LE(parseInt(params.customLightNumber), offset); offset += 2;
+    buffer.writeUInt8(params.customLightState ? 1 : 0, offset++);
+    buffer.writeUInt8(params.gearMode.charCodeAt(0), offset++);
+    buffer.writeUInt16LE(Math.round(params.cruiseSpeed * 3.6 * 10), offset); offset += 2;
+    buffer.writeUInt8(params.cruiseMode, offset++);
+    buffer.writeUInt8(params.ignitionState, offset++);
+    buffer.writeUInt8(params.engineState, offset++);
 
     let checksum = 0;
     for (let i = 1; i < offset; i++) {
-        checksum = (checksum + buffer[i]) & 0xFF;
+    checksum = (checksum + buffer[i]) & 0xFF;
     }
 
     buffer.writeUInt8(checksum, offset++);
     buffer.writeUInt8('E'.charCodeAt(0), offset++); // End marker
 
-    //console.log(data);
-    //console.log([...buff].map(b => b.toString(16).padStart(2, '0')).join(' '));
-    //console.log(asciiMsg);
+    return buffer;
+}
 
-    if (serialPort.isOpen) {
-        serialPort.write(buffer);
+if (isBeamngMode) {
+    const server = udp.createServer(function (buff) {
+        const data = {
+            car: buff.toString('ascii', 4, 8),
+            flags: buff.readUInt16LE(8),
+            gear: buff.readUInt8(10),
+            plid: buff.readUInt8(11),
+            speed: buff.readFloatLE(12),
+            rpm: buff.readFloatLE(16),
+            turbo: buff.readFloatLE(20),
+            engtemp: buff.readFloatLE(24),
+            fuel: buff.readFloatLE(28),
+            oilpressure: buff.readFloatLE(32),
+            oiltemp: buff.readFloatLE(36),
+            dashlights: buff.readInt32LE(40),
+            showlights: buff.readInt32LE(44),
+            throttle: buff.readFloatLE(48),
+            brake: buff.readFloatLE(52),
+            clutch: buff.readFloatLE(56),
+            gearMode: String.fromCharCode(buff.readUInt8(96)),
+            cruiseSpeed: buff.readFloatLE(100),
+            cruiseMode: buff.readUInt32LE(104),
+            fuelCapacity: buff.readFloatLE(108),
+            ignitionState: buff.readUInt16LE(112),
+            engineState: buff.readUInt16LE(114),
+        };
+
+        const injectionValue = updateFuelInjection(data, data.fuelCapacity);
+
+        const buffer = encodeCarData({
+            now: new Date(),
+            rpm: data.rpm,
+            speed: data.speed,
+            gear: data.gear,
+            engtemp: data.engtemp,
+            fuel: data.fuel,
+            showlights: data.showlights,
+            injectionValue: injectionValue,
+            customLightNumber: customLightNumber,
+            customLightState: customLightState,
+            gearMode: data.gearMode,
+            cruiseSpeed: data.cruiseSpeed,
+            cruiseMode: data.cruiseMode,
+            ignitionState: data.ignitionState,
+            engineState: data.engineState
+        });
+
+        //console.log(data);
+        //console.log([...buff].map(b => b.toString(16).padStart(2, '0')).join(' '));
+        //console.log(asciiMsg);
+
+        if (serialPort.isOpen) {
+            serialPort.write(buffer);
+        }
+    });
+
+    server.bind(4568);
+    console.log("UDP server listening on port 4568.");
+    console.log("Type a custom light command like '12T' or '5F' and press Enter.");
+} else if (isTruckSimMode) {
+    const telemetry = tst()
+
+    function update(data: any) {
+        const truck = data.truck;
+
+        const dashlights =
+            (truck.lights.beamHigh.value ? (1 << 1) : 0) |
+            (truck.lights.beamLow.value ? (1 << 12) : 0);
+
+        console.log(truck.transmission)
+        const buffer = encodeCarData({
+            now: new Date(),
+            rpm: truck.engine.rpm.value ?? 0,
+            speed: Math.abs(truck.speed.value ?? 0),
+            gear: Math.max(0, truck.transmission.gear.displayed + 1),
+            engtemp: 0,
+            fuel: 1,
+            showlights: dashlights,
+            injectionValue: 0,
+            customLightNumber: "0",
+            customLightState: false,
+            gearMode: truck.transmission.gear.value === 0 ? "N" :
+                    truck.transmission.gear.value < 0 ? "R" : "D",
+            cruiseSpeed: 0,
+            cruiseMode: 0,
+            ignitionState: 2,
+            engineState: 1
+        });
+
+        if (serialPort.isOpen) {
+            serialPort.write(buffer);
+        }
     }
-});
 
-server.bind(4568);
-console.log("UDP server listening on port 4568.");
-console.log("Type a custom light command like '12T' or '5F' and press Enter.");
+    telemetry.watch({interval: 50}, update)
+    console.log("Started truck simulator proxy.");
+} else {
+    console.log("BeamNG UDP server is disabled. Use '--beamng' to enable it.");
+}
 
 // Graceful shutdown
 process.on("SIGINT", () => {
