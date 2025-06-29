@@ -283,6 +283,7 @@ if (isBeamngMode) {
         const DL_OILWARN      = 1 << 8;
         const DL_BATTERY      = 1 << 9;
         const DL_ABS          = 1 << 10;
+        const DL_BEACON       = 1 << 11;
         const DL_LOWBEAM      = 1 << 12;
         const DL_ESC          = 1 << 13;
         const DL_CHECKENGINE  = 1 << 14;
@@ -297,7 +298,8 @@ if (isBeamngMode) {
             (truck.brakes.parking.enabled ? DL_HANDBRAKE : 0) |
             (truck.engine.oilPressure.warning.enabled ? DL_OILWARN : 0) |
             (truck.engine.batteryVoltage.warning.enabled ? DL_BATTERY : 0) |
-            (truck.engine.checkEngine?.value ? DL_CHECKENGINE : 0)
+            (truck.engine.damage >= 0.2 ? DL_CHECKENGINE : 0) |
+            (truck.lights.beacon.enabled ? DL_BEACON : 0)
         );
     }
 
