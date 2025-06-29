@@ -8,7 +8,12 @@ const readline = require("readline");
 const args = process.argv.slice(2);
 const isBeamngMode = args.includes("--beamng");
 const isTruckSimMode = args.includes("--trucksim");
-const portName = process.argv[2] || "COM3";
+const portName = process.argv[2];
+
+if (!portName) {
+    console.log(`Usage e.g. 'COM1 -- --beamng' or 'COM1 -- --trucksim'`);
+    process.exit()
+}
 
 const serialPort = new SerialPort({
     path: portName,
@@ -199,7 +204,7 @@ function encodeCarData(params: {
 
     let checksum = 0;
     for (let i = 1; i < offset; i++) {
-    checksum = (checksum + buffer[i]) & 0xFF;
+        checksum = (checksum + buffer[i]) & 0xFF;
     }
 
     buffer.writeUInt8(checksum, offset++);
@@ -287,8 +292,8 @@ if (isBeamngMode) {
         return (
             (truck.lights.beamHigh.enabled ? DL_FULLBEAM : 0) |
             (truck.lights.beamLow.enabled || truck.lights.parking.enabled ? DL_LOWBEAM : 0) |
-            (truck.lights.blinker.left.active || truck.lights.hazard.active ? DL_SIGNAL_L : 0) |
-            (truck.lights.blinker.right.active || truck.lights.hazard.active ? DL_SIGNAL_R : 0) |
+            (truck.lights.blinker.left.enabled || truck.lights.hazard.enabled ? DL_SIGNAL_L : 0) |
+            (truck.lights.blinker.right.enabled || truck.lights.hazard.enabled ? DL_SIGNAL_R : 0) |
             (truck.brakes.parking.enabled ? DL_HANDBRAKE : 0) |
             (truck.engine.oilPressure.warning.enabled ? DL_OILWARN : 0) |
             (truck.engine.batteryVoltage.warning.enabled ? DL_BATTERY : 0) |
@@ -313,16 +318,14 @@ if (isBeamngMode) {
         const dashlights = computeDashlights(truck);
 
         const rpm = truck.engine.rpm.value ?? 0;
-        const speed = Math.abs(truck.speed.kph ?? truck.speed.value ?? 0);
+        const speed = data.game.paused ? 0 : Math.abs(truck.speed.value ?? 0);
 
         const gearDisplayed = truck.transmission.gear.displayed ?? 0;
-        const gearValue = truck.transmission.gear.selected ?? 0;
 
         const gear = Math.max(0, gearDisplayed + 1);
         const gearMode =
             gear >= 7 ? "A" :
-            gearValue === 0 ? "N" :
-            gearValue < 0 ? "R" : "N";
+            gearDisplayed < 0 ? "R" : "N";
 
         const cruiseSpeed = truck.cruiseControl.kph ?? 0;
         const cruiseMode = truck.cruiseControl.enabled ? 1 : 0;
@@ -333,10 +336,10 @@ if (isBeamngMode) {
         const buffer = encodeCarData({
             now: getGameClockTime(data.game.time.value),
             rpm: rpm,
-            speed: speed / 3.6,
+            speed: speed,
             gear: gear,
             engtemp: engtemp,
-            fuel: Math.min(Math.max(fuelPct, 0), 1), // 0..1
+            fuel: Math.min(Math.max(fuelPct, 0), 1),
             showlights: dashlights,
             injectionValue: 0,
             customLightNumber: "0",
@@ -344,7 +347,7 @@ if (isBeamngMode) {
             gearMode: gearMode,
             cruiseSpeed: cruiseSpeed / 3.6,
             cruiseMode: cruiseMode,
-            ignitionState: truck.electric.enabled ? 2 : 1,
+            ignitionState: truck.electric.enabled ? 2 : 0,
             engineState: truck.engine.enabled ? 1 : 0
         });
 
@@ -356,7 +359,8 @@ if (isBeamngMode) {
     telemetry.watch({interval: 50}, update)
     console.log("Started truck simulator proxy.");
 } else {
-    console.log("BeamNG UDP server is disabled. Use '--beamng' to enable it.");
+    console.log("Use '--beamng' or '--trucksim' to enable the proxy.");
+    process.exit()
 }
 
 // Graceful shutdown
