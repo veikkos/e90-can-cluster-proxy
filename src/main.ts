@@ -173,7 +173,7 @@ function encodeCarData(params: {
     ignitionState: number;
     engineState: number;
 }): Buffer {
-    const buffer = Buffer.alloc(32); // 29 + checksum + 2 markers
+    const buffer = Buffer.alloc(31); // 29 + checksum + marker
     let offset = 0;
 
     buffer.writeUInt8('S'.charCodeAt(0), offset++); // Start marker
@@ -208,7 +208,6 @@ function encodeCarData(params: {
     }
 
     buffer.writeUInt8(checksum, offset++);
-    buffer.writeUInt8('E'.charCodeAt(0), offset++); // End marker
 
     return buffer;
 }
