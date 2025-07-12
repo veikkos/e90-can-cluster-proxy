@@ -164,6 +164,7 @@ function encodeCarData(params: {
     engtemp: number;
     fuel: number;
     showlights: number;
+    showlightsExt: number;
     injectionValue: number;
     customLightNumber: string;
     customLightState: boolean;
@@ -173,7 +174,7 @@ function encodeCarData(params: {
     ignitionState: number;
     engineState: number;
 }): Buffer {
-    const buffer = Buffer.alloc(31); // 29 + checksum + marker
+    const buffer = Buffer.alloc(32); // 30 + checksum + marker
     let offset = 0;
 
     buffer.writeUInt8('S'.charCodeAt(0), offset++); // Start marker
@@ -192,6 +193,7 @@ function encodeCarData(params: {
     buffer.writeUInt16LE(Math.round(params.fuel * 1000), offset); offset += 2;
 
     buffer.writeInt32LE(params.showlights, offset); offset += 4;
+    buffer.writeUInt8(params.showlightsExt, offset++);
 
     buffer.writeUInt16LE(Math.min(params.injectionValue, 9999), offset); offset += 2;
     buffer.writeUInt16LE(parseInt(params.customLightNumber), offset); offset += 2;
@@ -247,6 +249,7 @@ if (isBeamngMode) {
             engtemp: data.engtemp,
             fuel: data.fuel,
             showlights: data.showlights,
+            showlightsExt: 0,
             injectionValue: updateFuelInjection(data.fuel, data.fuelCapacity),
             customLightNumber: customLightNumber,
             customLightState: customLightState,
@@ -298,10 +301,19 @@ if (isBeamngMode) {
             (truck.engine.oilPressure.warning.enabled ? DL_OILWARN : 0) |
             (truck.engine.batteryVoltage.warning.enabled ? DL_BATTERY : 0) |
             (truck.engine.damage >= 0.2 ? DL_CHECKENGINE : 0) |
-            (truck.lights.beacon.enabled ? DL_BEACON : 0) |
-            (truck.transmission.damage > 0.1 ? 0 : 0) | // TODO
-            (truck.brakes.airPressure.warning.enabled ? 0 : 0) | // TODO
-            (truck.brakes.airPressure.emergency.enabled ? 0 : 0) | // TODO
+            (truck.lights.beacon.enabled ? DL_BEACON : 0)
+        );
+    }
+
+    function computeDashlightsExt(truck: any): number {
+        const DL_EXT_YELLOWTRIANGLE     = 1 << 0;
+        const DL_EXT_REDTRIANGLE        = 1 << 1;
+        const DL_EXT_GEARBOX_ISSUE      = 1 << 2;
+
+        return (
+            (truck.transmission.damage > 0.1 ? DL_EXT_GEARBOX_ISSUE : 0) |
+            (truck.brakes.airPressure.warning.enabled ? DL_EXT_YELLOWTRIANGLE : 0) |
+            (!truck.brakes.airPressure.warning.enabled && truck.brakes.airPressure.emergency.enabled ? DL_EXT_REDTRIANGLE : 0) |
             (truck.brakes.retarder.steps && truck.brakes.retarder.level ? 0 : 0) // TODO
         );
     }
@@ -319,8 +331,6 @@ if (isBeamngMode) {
 
     function update(data: any) {
         const truck = data.truck;
-
-        const dashlights = computeDashlights(truck);
 
         const rpm = truck.engine.rpm.value ?? 0;
         const speed = data.game.paused ? 0 : Math.abs(truck.speed.value ?? 0);
@@ -345,7 +355,8 @@ if (isBeamngMode) {
             gear: gear,
             engtemp: engtemp,
             fuel: Math.min(Math.max(fuelPct, 0), 1),
-            showlights: dashlights,
+            showlights: computeDashlights(truck),
+            showlightsExt: computeDashlightsExt(truck),
             injectionValue: 0,
             customLightNumber: customLightNumber,
             customLightState: customLightState,
