@@ -298,7 +298,11 @@ if (isBeamngMode) {
             (truck.engine.oilPressure.warning.enabled ? DL_OILWARN : 0) |
             (truck.engine.batteryVoltage.warning.enabled ? DL_BATTERY : 0) |
             (truck.engine.damage >= 0.2 ? DL_CHECKENGINE : 0) |
-            (truck.lights.beacon.enabled ? DL_BEACON : 0)
+            (truck.lights.beacon.enabled ? DL_BEACON : 0) |
+            (truck.transmission.damage > 0.1 ? 0 : 0) | // TODO
+            (truck.brakes.airPressure.warning.enabled ? 0 : 0) | // TODO
+            (truck.brakes.airPressure.emergency.enabled ? 0 : 0) | // TODO
+            (truck.brakes.retarder.steps && truck.brakes.retarder.level ? 0 : 0) // TODO
         );
     }
 
