@@ -189,7 +189,7 @@ function encodeCarData(params: {
     buffer.writeUInt16LE(Math.max(0, Math.min(65535, Math.round(params.rpm))), offset); offset += 2;
     buffer.writeUInt16LE(Math.round(params.speed * 3.6 * 10), offset); offset += 2;  // speed x10
     buffer.writeUInt8(params.gear, offset++);
-    buffer.writeUInt8(Math.round(params.engtemp), offset++);
+    buffer.writeInt8(Math.round(params.engtemp), offset++);
     buffer.writeUInt16LE(Math.round(params.fuel * 1000), offset); offset += 2;
 
     buffer.writeInt32LE(params.showlights, offset); offset += 4;
