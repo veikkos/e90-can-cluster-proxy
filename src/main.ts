@@ -161,7 +161,8 @@ function encodeCarData(params: {
     rpm: number;
     speed: number;
     gear: number;
-    engtemp: number;
+    waterTemp: number;
+    oilTemp: number;
     fuel: number;
     showlights: number;
     showlightsExt: number;
@@ -174,7 +175,7 @@ function encodeCarData(params: {
     ignitionState: number;
     engineState: number;
 }): Buffer {
-    const buffer = Buffer.alloc(32); // 30 + checksum + marker
+    const buffer = Buffer.alloc(33); // 30 + checksum + marker
     let offset = 0;
 
     buffer.writeUInt8('S'.charCodeAt(0), offset++); // Start marker
@@ -189,7 +190,8 @@ function encodeCarData(params: {
     buffer.writeUInt16LE(Math.max(0, Math.min(65535, Math.round(params.rpm))), offset); offset += 2;
     buffer.writeUInt16LE(Math.round(params.speed * 3.6 * 10), offset); offset += 2;  // speed x10
     buffer.writeUInt8(params.gear, offset++);
-    buffer.writeUInt8(Math.round(params.engtemp) & 0xFF, offset++);
+    buffer.writeUInt8(Math.round(params.waterTemp) & 0xFF, offset++);
+    buffer.writeUInt8(Math.round(params.oilTemp) & 0xFF, offset++);
     buffer.writeUInt16LE(Math.round(params.fuel * 1000), offset); offset += 2;
 
     buffer.writeInt32LE(params.showlights, offset); offset += 4;
@@ -224,10 +226,10 @@ if (isBeamngMode) {
             speed: buff.readFloatLE(12),
             rpm: buff.readFloatLE(16),
             turbo: buff.readFloatLE(20),
-            engtemp: buff.readFloatLE(24),
+            waterTemp: buff.readFloatLE(24),
             fuel: buff.readFloatLE(28),
             oilpressure: buff.readFloatLE(32),
-            oiltemp: buff.readFloatLE(36),
+            oilTemp: buff.readFloatLE(36),
             dashlights: buff.readInt32LE(40),
             showlights: buff.readInt32LE(44),
             throttle: buff.readFloatLE(48),
@@ -246,7 +248,8 @@ if (isBeamngMode) {
             rpm: data.rpm,
             speed: data.speed,
             gear: data.gear,
-            engtemp: data.engtemp,
+            waterTemp: data.waterTemp,
+            oilTemp: data.oilTemp,
             fuel: data.fuel,
             showlights: data.showlights,
             showlightsExt: 0,
@@ -346,7 +349,8 @@ if (isBeamngMode) {
         const cruiseSpeed = truck.cruiseControl.kph ?? 0;
         const cruiseMode = truck.cruiseControl.enabled ? 1 : 0;
 
-        const engtemp = Math.round(truck.engine.waterTemperature?.value ?? 0);
+        const waterTemp = Math.round(truck.engine.waterTemperature?.value ?? 0);
+        const oilTemp = Math.round(truck.engine.oilTemperature?.value ?? 0); // TODO: verify the location
         const fuelPct = truck.fuel.value / (truck.fuel.capacity || 1);
 
         const buffer = encodeCarData({
@@ -354,7 +358,8 @@ if (isBeamngMode) {
             rpm: rpm,
             speed: speed,
             gear: gear,
-            engtemp: engtemp,
+            waterTemp: waterTemp,
+            oilTemp: oilTemp,
             fuel: Math.min(Math.max(fuelPct, 0), 1),
             showlights: computeDashlights(truck),
             showlightsExt: computeDashlightsExt(truck),
