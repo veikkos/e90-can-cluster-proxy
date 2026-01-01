@@ -343,14 +343,14 @@ if (isBeamngMode) {
 
         const gear = Math.max(0, gearDisplayed + 1);
         const gearMode =
-            gear >= 7 ? "A" :
+            gear >= 1 ? "A" :
             gearDisplayed < 0 ? "R" : "N";
 
         const cruiseSpeed = truck.cruiseControl.kph ?? 0;
         const cruiseMode = truck.cruiseControl.enabled ? 1 : 0;
 
         const waterTemp = Math.round(truck.engine.waterTemperature?.value ?? 0);
-        const oilTemp = Math.round(truck.engine.oilTemperature?.value ?? 0); // TODO: verify the location
+        const oilTemp = Math.round(truck.engine.oilTemperature?.value ?? 0);
         const fuelPct = truck.fuel.value / (truck.fuel.capacity || 1);
 
         const buffer = encodeCarData({
