@@ -201,7 +201,7 @@ function encodeCarData(params: {
     buffer.writeUInt16LE(parseInt(params.customLightNumber), offset); offset += 2;
     buffer.writeUInt8(params.customLightState ? 1 : 0, offset++);
     buffer.writeUInt8(params.gearMode.charCodeAt(0), offset++);
-    buffer.writeUInt16LE(Math.round(params.cruiseSpeed * 3.6 * 10), offset); offset += 2;
+    buffer.writeUInt16LE(Math.round(params.cruiseSpeed * 3.6), offset); offset += 2;
     buffer.writeUInt8(params.cruiseMode, offset++);
     buffer.writeUInt8(params.ignitionState, offset++);
     buffer.writeUInt8(params.engineState, offset++);
