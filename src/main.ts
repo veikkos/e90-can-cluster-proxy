@@ -174,8 +174,9 @@ function encodeCarData(params: {
     cruiseMode: number;
     ignitionState: number;
     engineState: number;
+    envTemp: number;
 }): Buffer {
-    const buffer = Buffer.alloc(33); // 30 + checksum + marker
+    const buffer = Buffer.alloc(35); // 33 + checksum + marker
     let offset = 0;
 
     buffer.writeUInt8('S'.charCodeAt(0), offset++); // Start marker
@@ -205,6 +206,7 @@ function encodeCarData(params: {
     buffer.writeUInt8(params.cruiseMode, offset++);
     buffer.writeUInt8(params.ignitionState, offset++);
     buffer.writeUInt8(params.engineState, offset++);
+    buffer.writeInt16LE(Math.round(params.envTemp * 10), offset); offset += 2;
 
     let checksum = 0;
     for (let i = 1; i < offset; i++) {
@@ -241,6 +243,7 @@ if (isBeamngMode) {
             fuelCapacity: buff.readFloatLE(108),
             ignitionState: buff.readUInt16LE(112),
             engineState: buff.readUInt16LE(114),
+            envTemp: buff.readFloatLE(116),
         };
 
         const buffer = encodeCarData({
@@ -260,7 +263,8 @@ if (isBeamngMode) {
             cruiseSpeed: data.cruiseSpeed,
             cruiseMode: data.cruiseMode,
             ignitionState: data.ignitionState,
-            engineState: data.engineState
+            engineState: data.engineState,
+            envTemp: data.envTemp
         });
 
         //console.log(data);
@@ -372,7 +376,8 @@ if (isBeamngMode) {
             cruiseSpeed: cruiseSpeed / 3.6,
             cruiseMode: cruiseMode,
             ignitionState: truck.electric.enabled ? 2 : 0,
-            engineState: truck.engine.enabled ? 1 : 0
+            engineState: truck.engine.enabled ? 1 : 0,
+            envTemp: 20.0
         });
 
         if (serialPort.isOpen) {
