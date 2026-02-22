@@ -220,31 +220,41 @@ function encodeCarData(params: {
 
 if (isBeamngMode) {
     const server = udp.createServer(function (buff) {
-        const data = {
-            car: buff.toString('ascii', 4, 8),
-            flags: buff.readUInt16LE(8),
-            gear: buff.readUInt8(10),
-            plid: buff.readUInt8(11),
-            speed: buff.readFloatLE(12),
-            rpm: buff.readFloatLE(16),
-            turbo: buff.readFloatLE(20),
-            waterTemp: buff.readFloatLE(24),
-            fuel: buff.readFloatLE(28),
-            oilpressure: buff.readFloatLE(32),
-            oilTemp: buff.readFloatLE(36),
-            dashlights: buff.readInt32LE(40),
-            showlights: buff.readInt32LE(44),
-            throttle: buff.readFloatLE(48),
-            brake: buff.readFloatLE(52),
-            clutch: buff.readFloatLE(56),
-            gearMode: String.fromCharCode(buff.readUInt8(96)),
-            cruiseSpeed: buff.readFloatLE(100),
-            cruiseMode: buff.readUInt32LE(104),
-            fuelCapacity: buff.readFloatLE(108),
-            ignitionState: buff.readUInt16LE(112),
-            engineState: buff.readUInt16LE(114),
-            envTemp: buff.readFloatLE(116),
-        };
+        let data;
+        try {
+            data = {
+                car: buff.toString('ascii', 4, 8),
+                flags: buff.readUInt16LE(8),
+                gear: buff.readUInt8(10),
+                plid: buff.readUInt8(11),
+                speed: buff.readFloatLE(12),
+                rpm: buff.readFloatLE(16),
+                turbo: buff.readFloatLE(20),
+                waterTemp: buff.readFloatLE(24),
+                fuel: buff.readFloatLE(28),
+                oilpressure: buff.readFloatLE(32),
+                oilTemp: buff.readFloatLE(36),
+                dashlights: buff.readInt32LE(40),
+                showlights: buff.readInt32LE(44),
+                throttle: buff.readFloatLE(48),
+                brake: buff.readFloatLE(52),
+                clutch: buff.readFloatLE(56),
+                gearMode: String.fromCharCode(buff.readUInt8(96)),
+                cruiseSpeed: buff.readFloatLE(100),
+                cruiseMode: buff.readUInt32LE(104),
+                fuelCapacity: buff.readFloatLE(108),
+                ignitionState: buff.readUInt16LE(112),
+                engineState: buff.readUInt16LE(114),
+                envTemp: buff.readFloatLE(116),
+            };
+        } catch (err) {
+            if (err instanceof RangeError) {
+                console.error(`[UDP] Disable default OutGauge and ensure e90-can-cluster-beamng-protocol is correctly configured in BeamNG`);
+            } else {
+                console.error(`[UDP] Error parsing data: ${err.message}`);
+            }
+            return;
+        }
 
         const buffer = encodeCarData({
             now: new Date(),
