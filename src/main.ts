@@ -322,19 +322,29 @@ if (isBeamngMode) {
         );
     }
 
-    function computeDashlightsExt(truck: any): number {
+    function computeDashlightsExt(truck: any, navigation: any): number {
         const DL_EXT_YELLOWTRIANGLE     = 1 << 0;
         const DL_EXT_REDTRIANGLE        = 1 << 1;
         const DL_EXT_GEARBOX_ISSUE      = 1 << 2;
         const DL_EXT_BRAKERED           = 1 << 3;
         const DL_EXT_ADBLUE_LOW         = 1 << 4;
+        const DL_EXT_CHECKERED_FLAG     = 1 << 5;
+        const DL_EXT_LIMIT_YELLOW       = 1 << 6;
+        const DL_EXT_LIMIT_RED          = 1 << 7;
+
+        const speedKph = Math.abs(truck.speed.kph ?? 0);
+        const speedLimitKph = navigation?.speedLimit?.kph ?? 0;
+        const isOverSpeedLimitBy = (by: number) =>
+            speedLimitKph > 0 && speedKph - speedLimitKph >= by;
 
         return (
             (truck.transmission.damage > 0.1 ? DL_EXT_GEARBOX_ISSUE : 0) |
             (truck.brakes.airPressure.warning.enabled && !truck.brakes.airPressure.emergency.enabled ? DL_EXT_YELLOWTRIANGLE : 0) |
             (truck.brakes.airPressure.emergency.enabled ? DL_EXT_REDTRIANGLE : 0) |
             (truck.brakes.retarder.steps && truck.brakes.retarder.level ? DL_EXT_BRAKERED : 0) |
-            (truck.adBlue?.warning?.enabled ? DL_EXT_ADBLUE_LOW : 0)
+            (truck.adBlue?.warning?.enabled ? DL_EXT_ADBLUE_LOW : 0) |
+            (isOverSpeedLimitBy(5) && !isOverSpeedLimitBy(10) ? DL_EXT_LIMIT_YELLOW : 0) |
+            (isOverSpeedLimitBy(10) ? DL_EXT_LIMIT_RED : 0)
         );
     }
 
@@ -378,7 +388,7 @@ if (isBeamngMode) {
             oilTemp: oilTemp,
             fuel: Math.min(Math.max(fuelPct, 0), 1),
             showlights: computeDashlights(truck),
-            showlightsExt: computeDashlightsExt(truck),
+            showlightsExt: computeDashlightsExt(truck, data.navigation),
             injectionValue: 0,
             customLightNumber: customLightNumber,
             customLightState: customLightState,
