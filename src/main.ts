@@ -76,12 +76,12 @@ serialPort.on("error", (err) => {
 let customLightNumber = '0000';
 let customLightState = false;
 let lightLoopTimer;
-let lightLoopIndex = 400;
+let lightLoopIndex = 0;
 
 /*
 lightLoopTimer = setInterval(() => {
     // Turn off the previous light
-    customLightNumber = (lightLoopIndex - 1 <= 0 ? 99999 : lightLoopIndex - 1).toString().padStart(4, '0');
+    customLightNumber = (lightLoopIndex - 1 <= 0 ? 65535 : lightLoopIndex - 1).toString().padStart(4, '0');
     customLightState = false;
 
     // Emit OFF first
@@ -93,9 +93,9 @@ lightLoopTimer = setInterval(() => {
         customLightState = true;
         sendLoopState();
 
-        lightLoopIndex = (lightLoopIndex % 99999) + 1;
+        lightLoopIndex = (lightLoopIndex % 65535) + 1;
     }, 500);
-}, 4000);
+}, 2000);
 
 function sendLoopState() {
     // optional: show to user
