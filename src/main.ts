@@ -107,8 +107,15 @@ const rl = readline.createInterface({
     output: process.stdout
 });
 
+// BC button of the F-series cluster
+let bcPressedUntil = 0;
+
 rl.on("line", (input) => {
     input = input.trim().toUpperCase();
+    if (input === "B") {
+        bcPressedUntil = Date.now() + 200;
+        return;
+    }
     const match = input.match(/^(\d{1,4})([TF])$/);
     if (match) {
         customLightNumber = match[1].padStart(4, '0');
@@ -171,7 +178,8 @@ function encodeCarData(params: {
     customLightState: boolean;
     gearMode: string;
     cruiseSpeed: number;
-    cruiseMode: number;
+    statusFlags: number;
+    driveMode: number;
     ignitionState: number;
     engineState: number;
     envTemp: number;
@@ -195,7 +203,9 @@ function encodeCarData(params: {
     buffer.writeUInt8(Math.round(params.oilTemp) & 0xFF, offset++);
     buffer.writeUInt16LE(Math.round(params.fuel * 1000), offset); offset += 2;
 
-    buffer.writeInt32LE(params.showlights, offset); offset += 4;
+    // Drive mode to showlights bits 3 and 7
+    const driveModeBits = ((params.driveMode & 0x01) << 3) | ((params.driveMode & 0x02) << 6);
+    buffer.writeInt32LE((params.showlights & ~0x88) | driveModeBits, offset); offset += 4;
     buffer.writeUInt8(params.showlightsExt, offset++);
 
     buffer.writeUInt16LE(Math.min(params.injectionValue, 9999), offset); offset += 2;
@@ -203,7 +213,8 @@ function encodeCarData(params: {
     buffer.writeUInt8(params.customLightState ? 1 : 0, offset++);
     buffer.writeUInt8(params.gearMode.charCodeAt(0), offset++);
     buffer.writeUInt16LE(Math.round(params.cruiseSpeed * 3.6), offset); offset += 2;
-    buffer.writeUInt8(params.cruiseMode, offset++);
+    const bcButton = Date.now() < bcPressedUntil ? 0x80 : 0;
+    buffer.writeUInt8((params.statusFlags & 0x7F) | bcButton, offset++);
     buffer.writeUInt8(params.ignitionState, offset++);
     buffer.writeUInt8(params.engineState, offset++);
     buffer.writeInt16LE(Math.round(params.envTemp * 10), offset); offset += 2;
@@ -241,7 +252,7 @@ if (isBeamngMode) {
                 clutch: buff.readFloatLE(56),
                 gearMode: String.fromCharCode(buff.readUInt8(96)),
                 cruiseSpeed: buff.readFloatLE(100),
-                cruiseMode: buff.readUInt32LE(104),
+                statusFlags: buff.readUInt32LE(104),
                 fuelCapacity: buff.readFloatLE(108),
                 ignitionState: buff.readUInt16LE(112),
                 engineState: buff.readUInt16LE(114),
@@ -271,7 +282,8 @@ if (isBeamngMode) {
             customLightState: customLightState,
             gearMode: data.gearMode,
             cruiseSpeed: data.cruiseSpeed,
-            cruiseMode: data.cruiseMode,
+            statusFlags: data.statusFlags,
+            driveMode: (data.flags >> 8) & 0x03,
             ignitionState: data.ignitionState,
             engineState: data.engineState,
             envTemp: data.envTemp
@@ -289,6 +301,7 @@ if (isBeamngMode) {
     server.bind(4568);
     console.log("UDP server listening on port 4568.");
     console.log("Type a custom light command like '12T' or '5F' and press Enter.");
+    console.log("Type 'B' and press Enter for the BC button (F-series).");
 } else if (isTruckSimMode) {
     const telemetry = tst()
 
@@ -394,7 +407,8 @@ if (isBeamngMode) {
             customLightState: customLightState,
             gearMode: gearMode,
             cruiseSpeed: cruiseSpeed / 3.6,
-            cruiseMode: cruiseMode,
+            statusFlags: cruiseMode,
+            driveMode: 0,
             ignitionState: truck.electric.enabled ? 2 : 0,
             engineState: truck.engine.enabled ? 1 : 0,
             envTemp: 20.0

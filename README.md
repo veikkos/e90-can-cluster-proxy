@@ -31,3 +31,10 @@ or
 ```
 
 Set the COM port number so that it matches your Arduino.
+
+## Keys
+
+Type in the terminal where the proxy runs:
+
+- `12T` or `12F` and Enter: turn the custom warning symbol 12 on or off
+- `B` and Enter: BC button (F-series)
