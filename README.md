@@ -81,11 +81,11 @@ Fields and bits marked F02 are used only by the F-series firmware.
 Bit  0 : DL_SHIFT         (Shift light) UNUSED
 Bit  1 : DL_FULLBEAM      (Full beam headlights)
 Bit  2 : DL_HANDBRAKE     (Handbrake engaged)
-Bit  3 : DL_DRIVEMODE_LO  (Drive mode, low bit) (F02)
+Bit  3 : DL_DRIVEMODE_LO  (Drive mode, low bit)
 Bit  4 : DL_TC            (Traction control active)
 Bit  5 : DL_SIGNAL_L      (Left turn signal)
 Bit  6 : DL_SIGNAL_R      (Right turn signal)
-Bit  7 : DL_DRIVEMODE_HI  (Drive mode, high bit) (F02)
+Bit  7 : DL_DRIVEMODE_HI  (Drive mode, high bit)
 Bit  8 : DL_OILWARN       (Oil pressure warning)
 Bit  9 : DL_BATTERY       (Battery warning) UNUSED
 Bit 10 : DL_ABS           (ABS active/disabled) UNUSED
@@ -112,7 +112,7 @@ Bit 30 : DL_TC_DISABLED   (Traction control disabled)
 Bit 31 : DL_ESC_DISABLED  (ESC disabled)
 ```
 
-Drive mode (F02): 0 = unknown, 1 = comfort, 2 = sport, 3 = sport+
+Drive mode: 0 = unknown, 1 = comfort, 2 = sport, 3 = sport+
 
 ### `showlights ext` Breakdown
 
