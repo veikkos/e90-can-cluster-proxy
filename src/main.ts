@@ -163,6 +163,9 @@ function updateFuelInjection(fuel, fuelCapacity) {
     return 0;
 }
 
+// Gear extension chars from the games to the low nibble of the gear mode byte
+const GEAR_EXTENSIONS: Record<string, number> = { N: 0, A: 1, M: 2, S: 3, P: 4 };
+
 function encodeCarData(params: {
     now: Date;
     rpm: number;
@@ -180,11 +183,13 @@ function encodeCarData(params: {
     cruiseSpeed: number;
     statusFlags: number;
     driveMode: number;
+    bonnetOpen: boolean;
+    coasting: boolean;
     ignitionState: number;
     engineState: number;
     envTemp: number;
 }): Buffer {
-    const buffer = Buffer.alloc(35); // 33 + checksum + marker
+    const buffer = Buffer.alloc(38); // 36 + checksum + marker
     let offset = 0;
 
     buffer.writeUInt8('S'.charCodeAt(0), offset++); // Start marker
@@ -203,18 +208,21 @@ function encodeCarData(params: {
     buffer.writeUInt8(Math.round(params.oilTemp) & 0xFF, offset++);
     buffer.writeUInt16LE(Math.round(params.fuel * 1000), offset); offset += 2;
 
-    // Drive mode to showlights bits 3 and 7
-    const driveModeBits = ((params.driveMode & 0x01) << 3) | ((params.driveMode & 0x02) << 6);
-    buffer.writeInt32LE((params.showlights & ~0x88) | driveModeBits, offset); offset += 4;
-    buffer.writeUInt8(params.showlightsExt, offset++);
+    buffer.writeInt32LE(params.showlights, offset); offset += 4;
+    const bcButton = Date.now() < bcPressedUntil;
+    const showlightsExt = params.showlightsExt |
+        (params.bonnetOpen ? 1 << 8 : 0) |
+        (bcButton ? 1 << 9 : 0) |
+        (params.coasting ? 1 << 10 : 0);
+    buffer.writeUInt32LE(showlightsExt, offset); offset += 4;
 
     buffer.writeUInt16LE(Math.min(params.injectionValue, 9999), offset); offset += 2;
     buffer.writeUInt16LE(parseInt(params.customLightNumber), offset); offset += 2;
     buffer.writeUInt8(params.customLightState ? 1 : 0, offset++);
-    buffer.writeUInt8(params.gearMode.charCodeAt(0), offset++);
+    const gearExtension = GEAR_EXTENSIONS[params.gearMode] ?? 0;
+    buffer.writeUInt8(gearExtension | ((params.driveMode & 0x0F) << 4), offset++);
     buffer.writeUInt16LE(Math.round(params.cruiseSpeed * 3.6), offset); offset += 2;
-    const bcButton = Date.now() < bcPressedUntil ? 0x80 : 0;
-    buffer.writeUInt8((params.statusFlags & 0x7F) | bcButton, offset++);
+    buffer.writeUInt8(params.statusFlags & 0x3F, offset++);
     buffer.writeUInt8(params.ignitionState, offset++);
     buffer.writeUInt8(params.engineState, offset++);
     buffer.writeInt16LE(Math.round(params.envTemp * 10), offset); offset += 2;
@@ -283,7 +291,9 @@ if (isBeamngMode) {
             gearMode: data.gearMode,
             cruiseSpeed: data.cruiseSpeed,
             statusFlags: data.statusFlags,
-            driveMode: (data.flags >> 8) & 0x03,
+            driveMode: (data.flags >> 8) & 0x07,
+            bonnetOpen: (data.statusFlags & 0x80) !== 0,
+            coasting: (data.statusFlags & 0x40) !== 0,
             ignitionState: data.ignitionState,
             engineState: data.engineState,
             envTemp: data.envTemp
@@ -409,6 +419,8 @@ if (isBeamngMode) {
             cruiseSpeed: cruiseSpeed / 3.6,
             statusFlags: cruiseMode,
             driveMode: 0,
+            bonnetOpen: false,
+            coasting: false,
             ignitionState: truck.electric.enabled ? 2 : 0,
             engineState: truck.engine.enabled ? 1 : 0,
             envTemp: 20.0

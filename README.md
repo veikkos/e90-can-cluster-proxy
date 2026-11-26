@@ -63,17 +63,17 @@ Fields and bits marked F02 are used only by the F-series firmware.
 | 13     | 1    | `oil temp`          | °C                                   |
 | 14     | 2    | `fuel`              | 0–1000 (% × 10)                      |
 | 16     | 4    | `showlights`        | Bitfield of all light states (see tables below) |
-| 20     | 1    | `showlights ext`    | Bitfield of extended light states (see tables below) |
-| 21     | 2    | `fuel injection`    | microliters per 100 ms               |
-| 23     | 2    | `custom light`      | Symbol ID (0–65535)                  |
-| 25     | 1    | `custom light on`   | 1 = show, 0 = off                    |
-| 26     | 1    | `gear extension`    | ASCII char: M = semi-automatic, S = sport mode, P = park, A = automatic, N = none |
-| 27     | 2    | `cruise speed`      | km/h                                 |
-| 29     | 1    | `cruise status`     | Bit 0: Active (1=on, 0=off), Bit 1: Vehicle ahead, Bit 2: Collision warning, Bits 3-5: Adaptive cruise following distance (1-4), Bit 6: Coasting (F02), Bit 7: BC button pressed (F02) |
-| 30     | 1    | `ignition`          | 3 = starter, 2 = on, 1 = accessory only, 0 = off |
-| 31     | 1    | `engine running`    | 1 = on, 0 = off                      |
-| 32     | 2    | `ambient temp`      | Signed, °C × 10 (e.g. 215 = 21.5°C, -50 = -5.0°C) |
-| 34     | 1    | `checksum`          | Additive checksum of all previous bytes excluding start marker |
+| 20     | 4    | `showlights ext`    | Bitfield of extended light states (see tables below) |
+| 24     | 2    | `fuel injection`    | microliters per 100 ms               |
+| 26     | 2    | `custom light`      | Symbol ID (0–65535)                  |
+| 28     | 1    | `custom light on`   | 1 = show, 0 = off                    |
+| 29     | 1    | `gear mode`         | Gear extension and drive mode (see table below) |
+| 30     | 2    | `cruise speed`      | km/h                                 |
+| 32     | 1    | `cruise status`     | Bit 0: Active (1=on, 0=off), Bit 1: Vehicle ahead, Bit 2: Collision warning, Bits 3-5: Adaptive cruise following distance (1-4) |
+| 33     | 1    | `ignition`          | 3 = starter, 2 = on, 1 = accessory only, 0 = off |
+| 34     | 1    | `engine running`    | 1 = on, 0 = off                      |
+| 35     | 2    | `ambient temp`      | Signed, °C × 10 (e.g. 215 = 21.5°C, -50 = -5.0°C) |
+| 37     | 1    | `checksum`          | Additive checksum of all previous bytes excluding start marker |
 
 ### `showlights` Breakdown
 
@@ -81,11 +81,11 @@ Fields and bits marked F02 are used only by the F-series firmware.
 Bit  0 : DL_SHIFT         (Shift light) UNUSED
 Bit  1 : DL_FULLBEAM      (Full beam headlights)
 Bit  2 : DL_HANDBRAKE     (Handbrake engaged)
-Bit  3 : DL_DRIVEMODE_LO  (Drive mode, low bit)
+Bit  3 : UNUSED
 Bit  4 : DL_TC            (Traction control active)
 Bit  5 : DL_SIGNAL_L      (Left turn signal)
 Bit  6 : DL_SIGNAL_R      (Right turn signal)
-Bit  7 : DL_DRIVEMODE_HI  (Drive mode, high bit)
+Bit  7 : UNUSED
 Bit  8 : DL_OILWARN       (Oil pressure warning)
 Bit  9 : DL_BATTERY       (Battery warning) UNUSED
 Bit 10 : DL_ABS           (ABS active/disabled) UNUSED
@@ -112,8 +112,6 @@ Bit 30 : DL_TC_DISABLED   (Traction control disabled)
 Bit 31 : DL_ESC_DISABLED  (ESC disabled)
 ```
 
-Drive mode: 0 = unknown, 1 = comfort, 2 = sport, 3 = sport+
-
 ### `showlights ext` Breakdown
 
 ```
@@ -125,4 +123,15 @@ Bit  4 : DL_EXT_ADBLUE_LOW       (AdBlue level low)
 Bit  5 : DL_EXT_CHECKERED_FLAG   (Checkered flag, launch control)
 Bit  6 : DL_EXT_LIMIT_YELLOW     (Speed limit, yellow)
 Bit  7 : DL_EXT_LIMIT_RED        (Speed limit, red)
+Bit  8 : DL_EXT_BONNET_OPEN      (Bonnet open) F02
+Bit  9 : DL_EXT_BC_BUTTON        (BC button pressed) F02
+Bit 10 : DL_EXT_COASTING         (Coasting, EfficientDynamics) F02
+Bits 11-31 : reserved, send 0
+```
+
+### `gear mode` Breakdown
+
+```
+Bits 0-3 : Gear extension  0 = none, 1 = automatic, 2 = semi-automatic, 3 = sport mode, 4 = park
+Bits 4-7 : Drive mode      0 = unknown, 1 = comfort, 2 = sport, 3 = sport+, 4 = ECO PRO (F02)
 ```
